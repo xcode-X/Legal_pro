@@ -1,54 +1,86 @@
 /**
- * useDocumentStore — Manages documents, templates, and filings state.
- * In production each action would call a corresponding REST API endpoint.
+ * useDocumentStore — Manages documents, templates, and filings state via Firestore.
  */
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import { SAMPLE_TEMPLATES } from '../data/templates'
-import { SAMPLE_DOCUMENTS } from '../data/documents'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { db } from '../firebase'
+import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore'
 
 const useDocumentStore = create(
     persist(
         (set, get) => ({
-            documents: [...SAMPLE_DOCUMENTS],
-            templates: [...SAMPLE_TEMPLATES],
+            documents: [],
+            templates: [],
             filings: [],
             selectedDocument: null,
             isGenerating: false,
             generationProgress: 0,
+            
+            _unsubDocs: null,
+            _unsubTemplates: null,
+            _unsubFilings: null,
 
-            /* ---- Document Actions ---- */
-
-            /** Set the currently viewed document */
+            /** Set the currently viewed document locally */
             selectDocument: (doc) => set({ selectedDocument: doc }),
 
-            /** Add a newly generated document */
-            addDocument: (doc) =>
-                set((state) => ({ documents: [doc, ...state.documents] })),
+            /** Start Real-Time Firebase Listeners */
+            startSyncing: () => {
+                const state = get()
+                if (state._unsubDocs) state._unsubDocs()
+                if (state._unsubTemplates) state._unsubTemplates()
+                if (state._unsubFilings) state._unsubFilings()
+
+                const unsubDocs = onSnapshot(collection(db, 'documents'), (snapshot) => {
+                    const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+                    set(s => ({ 
+                        documents: docs.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)),
+                        selectedDocument: s.selectedDocument ? docs.find(d => d.id === s.selectedDocument.id) || s.selectedDocument : null 
+                    }))
+                })
+
+                const unsubTemplates = onSnapshot(collection(db, 'templates'), (snapshot) => {
+                    const tpls = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+                    set({ templates: tpls })
+                })
+
+                const unsubFilings = onSnapshot(collection(db, 'filings'), (snapshot) => {
+                    const fils = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+                    set({ filings: fils })
+                })
+
+                set({ _unsubDocs: unsubDocs, _unsubTemplates: unsubTemplates, _unsubFilings: unsubFilings })
+            },
+
+            /** Stop listeners */
+            stopSyncing: () => {
+                const state = get()
+                if (state._unsubDocs) state._unsubDocs()
+                if (state._unsubTemplates) state._unsubTemplates()
+                if (state._unsubFilings) state._unsubFilings()
+                set({ _unsubDocs: null, _unsubTemplates: null, _unsubFilings: null, documents: [], templates: [], filings: [], selectedDocument: null })
+            },
 
             /** Update a document's fields */
-            updateDocument: (id, updates) =>
-                set((state) => ({
-                    documents: state.documents.map((d) =>
-                        d.id === id ? { ...d, ...updates } : d
-                    ),
-                    selectedDocument:
-                        state.selectedDocument?.id === id
-                            ? { ...state.selectedDocument, ...updates }
-                            : state.selectedDocument,
-                })),
+            updateDocument: async (id, updates) => {
+                try {
+                    await updateDoc(doc(db, 'documents', id), updates)
+                } catch(e) {
+                    console.error("Failed to update doc:", e)
+                }
+            },
 
             /** Delete a document by id */
-            deleteDocument: (id) =>
-                set((state) => ({
-                    documents: state.documents.filter((d) => d.id !== id),
-                    selectedDocument:
-                        state.selectedDocument?.id === id ? null : state.selectedDocument,
-                })),
+            deleteDocument: async (id) => {
+                try {
+                    if (get().selectedDocument?.id === id) set({ selectedDocument: null })
+                    await deleteDoc(doc(db, 'documents', id))
+                } catch(e) {
+                    console.error("Failed to delete doc:", e)
+                }
+            },
 
             /**
              * Simulate AI document generation with progress feedback.
-             * In production: POST /api/documents/generate
              */
             generateDocument: async (formData, templateId, userName = 'Unknown User') => {
                 const template = get().templates.find((t) => t.id === templateId)
@@ -56,23 +88,23 @@ const useDocumentStore = create(
 
                 set({ isGenerating: true, generationProgress: 0 })
 
-                // Simulate streaming generation steps
+                // Simulate AI streaming delay
                 const steps = [10, 25, 45, 60, 75, 88, 100]
                 for (const step of steps) {
                     await new Promise((r) => setTimeout(r, 280))
                     set({ generationProgress: step })
                 }
 
-                // Fill template placeholders with form data
-                let content = template.content
+                // Fill template placeholders
+                let content = template.content || ""
                 Object.entries(formData).forEach(([key, val]) => {
                     content = content.replace(new RegExp(`\\[${key}\\]`, 'g'), val || `[${key}]`)
                 })
 
-                const doc = {
-                    id: `doc_${Date.now()}`,
-                    title: `${template.name} — ${formData.clientName || 'Client'}`,
-                    type: template.category,
+                const docId = `doc_${Date.now()}`
+                const docData = {
+                    title: `${formData.title || template.name} — ${formData.clientName || 'Client'}`,
+                    type: template.category || 'General',
                     templateId,
                     status: 'Draft',
                     content,
@@ -86,42 +118,59 @@ const useDocumentStore = create(
                     versions: [],
                 }
 
-                set((state) => ({
-                    documents: [doc, ...state.documents],
-                    isGenerating: false,
-                    generationProgress: 0,
-                }))
-
-                return doc
+                try {
+                    await setDoc(doc(db, 'documents', docId), docData)
+                    const finalDoc = { id: docId, ...docData }
+                    set({ isGenerating: false, generationProgress: 0 })
+                    return finalDoc
+                } catch(e) {
+                    console.error("Generate failed:", e)
+                    set({ isGenerating: false, generationProgress: 0 })
+                    return null
+                }
             },
 
             /* ---- Template Actions ---- */
 
-            addTemplate: (tpl) =>
-                set((state) => ({ templates: [tpl, ...state.templates] })),
+            addTemplate: async (tpl) => {
+                const docId = `tpl_${Date.now()}`
+                await setDoc(doc(db, 'templates', docId), tpl)
+            },
 
-            updateTemplate: (id, updates) =>
-                set((state) => ({
-                    templates: state.templates.map((t) => (t.id === id ? { ...t, ...updates } : t)),
-                })),
+            updateTemplate: async (id, updates) => {
+                await updateDoc(doc(db, 'templates', id), updates)
+            },
 
-            deleteTemplate: (id) =>
-                set((state) => ({ templates: state.templates.filter((t) => t.id !== id) })),
+            deleteTemplate: async (id) => {
+                await deleteDoc(doc(db, 'templates', id))
+            },
 
             /* ---- Filing Actions ---- */
 
-            submitFiling: (docId) =>
-                set((state) => ({
-                    documents: state.documents.map((d) =>
-                        d.id === docId
-                            ? { ...d, status: 'Pending', submittedAt: new Date().toISOString() }
-                            : d
-                    ),
-                })),
+            submitFiling: async (docId) => {
+                const docRef = get().documents.find(d => d.id === docId)
+                if (!docRef) return
+                
+                try {
+                    await updateDoc(doc(db, 'documents', docId), { status: 'Pending', submittedAt: new Date().toISOString() })
+                    
+                    const filingId = `fil_${Date.now()}`
+                    await setDoc(doc(db, 'filings', filingId), {
+                        documentId: docId,
+                        title: docRef.title,
+                        status: 'Pending',
+                        submittedAt: new Date().toISOString(),
+                        courtInfo: 'Supreme Court Circuit'
+                    })
+                } catch(e) {
+                    console.error("Failed Filing:", e)
+                }
+            },
         }),
         {
             name: 'ldgfa-document-store',
-            partialize: (state) => ({ documents: state.documents, templates: state.templates, filings: state.filings })
+            storage: createJSONStorage(() => sessionStorage),
+            partialize: (state) => ({ selectedDocument: state.selectedDocument }) // Do not cache lists in session if pulling from Firebase
         }
     )
 )

@@ -101,9 +101,9 @@ function FilingRow({ doc, onSubmit }) {
                                 onClick={() => onSubmit(doc.id)} 
                             />
                         )}
-                        <FilingAction icon={HiEye} title="Preview Artifact" onClick={() => {}} />
-                        <FilingAction icon={HiDownload} title="Export Formal PDF" onClick={() => {}} />
-                        <FilingAction icon={HiTrash} title="Purge Record" danger onClick={() => {}} />
+                        <FilingAction icon={HiEye} title="View Document" onClick={() => {}} />
+                        <FilingAction icon={HiDownload} title="Download PDF" onClick={() => {}} />
+                        <FilingAction icon={HiTrash} title="Delete Document" danger onClick={() => {}} />
                     </div>
                     
                     <button className={clsx(
@@ -172,18 +172,17 @@ function FilingRow({ doc, onSubmit }) {
                                 </div>
                             </div>
 
-                            {/* Document Meta Information Header */}
                             <div className="flex items-center gap-3 mb-4 px-2">
                                 <span className="h-1 w-8 rounded-full bg-slate-900" />
-                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Formal Metadata Analysis</h4>
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Document Details</h4>
                             </div>
 
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                                 {[
-                                    { label: 'Classification', value: doc.type, icon: HiBadgeCheck },
-                                    { label: 'Protocol Version', value: `Build v${doc.version}.0`, icon: HiLightningBolt },
-                                    { label: 'Physical Length', value: `${doc.pageCount} Sequential Pages`, icon: HiClipboardList },
-                                    { label: 'Lexical Volume', value: `${doc.wordCount.toLocaleString()} Words`, icon: HiTrendingUp },
+                                    { label: 'Type', value: doc.type, icon: HiBadgeCheck },
+                                    { label: 'Version', value: `v${doc.version}.0`, icon: HiLightningBolt },
+                                    { label: 'Pages', value: `${doc.pageCount} Pages`, icon: HiClipboardList },
+                                    { label: 'Word Count', value: `${doc.wordCount.toLocaleString()} Words`, icon: HiTrendingUp },
                                 ].map((stat) => (
                                     <div key={stat.label} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:border-slate-400 transition-colors">
                                         <div className="flex items-center gap-3 mb-3">
@@ -225,10 +224,10 @@ export default function FilingsPage() {
 
     // Advanced Stats Redesign
     const stats = [
-        { label: 'Total Dossiers', value: documents.length, icon: HiClipboardList, gradient: 'from-slate-900 via-slate-800 to-slate-900' },
-        { label: 'Pending Transmit', value: counts['Pending'], icon: HiClock, gradient: 'from-slate-900 via-slate-800 to-indigo-950' },
-        { label: 'In Adjudication', value: counts['Submitted'], icon: HiLightningBolt, gradient: 'from-indigo-950 via-slate-900 to-slate-900' },
-        { label: 'Verified Results', value: counts['Approved'], icon: HiBadgeCheck, gradient: 'from-slate-900 via-slate-800 to-slate-900' },
+        { label: 'Total Filings', value: documents.length, icon: HiClipboardList, gradient: 'from-slate-900 via-slate-800 to-slate-900' },
+        { label: 'Pending', value: counts['Pending'], icon: HiClock, gradient: 'from-slate-900 via-slate-800 to-indigo-950' },
+        { label: 'Submitted', value: counts['Submitted'], icon: HiLightningBolt, gradient: 'from-indigo-950 via-slate-900 to-slate-900' },
+        { label: 'Approved', value: counts['Approved'], icon: HiBadgeCheck, gradient: 'from-slate-900 via-slate-800 to-slate-900' },
     ]
 
     return (
@@ -242,7 +241,7 @@ export default function FilingsPage() {
                 </div>
                 <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-3 uppercase">Filings & Submissions</h1>
                 <p className="text-slate-500 max-w-xl mx-auto text-sm font-medium leading-relaxed">
-                    Continuously track the procedural trajectory and adjudication status of all legal artifacts and formal submissions.
+                    Track the status of all your document filings from drafting to final approval.
                 </p>
                 
                 <div className="mt-8 flex items-center justify-center gap-3">
@@ -289,11 +288,11 @@ export default function FilingsPage() {
                 <div className="flex items-center justify-between px-6 mb-2">
                     <div className="flex items-center gap-3">
                          <div className="h-1 w-6 rounded-full bg-black" />
-                         <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.15em]">Procedural Registry Ledger</h3>
+                         <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.15em]">Filing History</h3>
                     </div>
                     <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                         Transmission Protocol Matrix
+                         Live Tracking
                     </div>
                 </div>
 

@@ -6,11 +6,10 @@ import useAuthStore from '../store/useAuthStore'
 import { motion } from 'framer-motion'
 
 const DEMO_CREDS = [
-    { role: 'Lawyer', email: 'lawyer@ldgfa.com', password: 'lawyer123' },
-    { role: 'Paralegal', email: 'paralegal@ldgfa.com', password: 'para123' },
+    { role: 'Admin HQ', email: 'admin@ldgfa.com', password: 'adminpassword' },
 ]
 
-export default function LoginPage() {
+export default function AdminLoginPage() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [phone, setPhone] = useState('')
@@ -130,8 +129,8 @@ export default function LoginPage() {
                     className="w-full max-w-md"
                 >
                     <div className="text-center lg:text-left mb-10">
-                        <h3 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">Professional Sign In</h3>
-                        <p className="text-gray-500 font-medium">Access your firm’s intelligence dashboard.</p>
+                        <h3 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">Administrator Command</h3>
+                        <p className="text-gray-500 font-medium">System and platform oversight gate.</p>
                     </div>
 
                     <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-gray-200/50 p-10 border border-gray-100 relative overflow-hidden">
@@ -288,7 +287,7 @@ export default function LoginPage() {
                     </div>
 
                     <p className="mt-8 text-center text-sm font-medium text-gray-500">
-                        New to LDGFA? <Link to="/signup" className="text-primary-600 font-black hover:underline underline-offset-4">Create Firm Account</Link>
+                        Not an Admin? <Link to="/login" className="text-primary-600 font-black hover:underline underline-offset-4">Firm Login</Link>
                     </p>
                 </motion.div>
             </div>

@@ -50,11 +50,11 @@ const PLANS = [
 ]
 
 const BASE_TABS = [
-    { id: 'profile',       label: 'Identity Matrix',      icon: HiUser },
-    { id: 'subscription',  label: 'Remittance Hub',       icon: HiCreditCard },
-    { id: 'notifications', label: 'Alert Protocols',      icon: HiBell },
-    { id: 'security',      label: 'Security Perimeter',   icon: HiShieldCheck },
-    { id: 'ai',            label: 'AI Architecture',      icon: HiSparkles },
+    { id: 'profile',       label: 'Profile',      icon: HiUser },
+    { id: 'subscription',  label: 'Billing',       icon: HiCreditCard },
+    { id: 'notifications', label: 'Notifications',      icon: HiBell },
+    { id: 'security',      label: 'Security',   icon: HiShieldCheck },
+    { id: 'ai',            label: 'AI Settings',      icon: HiSparkles },
 ]
 
 const containerVariants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }
@@ -66,7 +66,7 @@ export default function SettingsPage() {
     const isAdmin = user?.role === 'Admin'
 
     const TABS = isAdmin
-        ? [...BASE_TABS, { id: 'users', label: 'Authority Hub', icon: HiUserGroup }]
+        ? [...BASE_TABS, { id: 'users', label: 'Manage Users', icon: HiUserGroup }]
         : BASE_TABS
 
     const [activeTab, setActiveTab] = useState('profile')
@@ -102,7 +102,7 @@ export default function SettingsPage() {
     const handleSaveProfile = () => {
         updateProfile({ name: form.name, firm: form.firm })
         setSaved(true)
-        addToast('Identity matrix synchronized.', 'success')
+        addToast('Profile saved successfully.', 'success')
         setTimeout(() => setSaved(false), 2500)
     }
 
@@ -122,7 +122,17 @@ export default function SettingsPage() {
         localStorage.setItem('ldgfa_ai_config', JSON.stringify(aiConfig))
         await new Promise(r => setTimeout(r, 800))
         setAiSaving(false)
-        addToast('Intelligence parameters deployed.', 'success')
+        addToast('AI settings saved.', 'success')
+    }
+
+    const handleApprove = (id, name) => {
+        approveAccount(id)
+        addToast(`User ${name} approved.`, 'success')
+    }
+
+    const handleReject = (id, name) => {
+        rejectAccount(id)
+        addToast(`User ${name} rejected.`, 'info')
     }
 
     return (
@@ -131,9 +141,9 @@ export default function SettingsPage() {
             {/* Page Header */}
             <motion.div variants={itemVariants} className="border-b border-slate-200 pb-10 relative">
                  <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 rounded-full blur-3xl opacity-60 -z-10 pointer-events-none" />
-                 <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase mb-4">System Portfolio</h1>
+                 <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase mb-4">Settings</h1>
                  <p className="text-slate-500 max-w-xl text-sm font-medium leading-relaxed">
-                    Configure your high-fidelity legal ecosystem. Fine-tune identity parameters, security perimeters, and modular intelligence configurations.
+                    Manage your account profile, billing, security, and set up your AI models.
                  </p>
             </motion.div>
 
@@ -210,10 +220,10 @@ export default function SettingsPage() {
                                                 <div className="space-y-6">
                                                      <div className="flex items-center gap-3">
                                                         <div className="h-1 w-6 rounded-full bg-slate-900" />
-                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Core Remittance</h4>
+                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Basic Details</h4>
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Full Nomenclature</label>
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Full Name</label>
                                                         <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full bg-slate-50 border border-slate-100 text-slate-900 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-slate-100 transition-all font-bold text-sm" />
                                                     </div>
                                                     <div>
@@ -225,10 +235,10 @@ export default function SettingsPage() {
                                                 <div className="space-y-6">
                                                      <div className="flex items-center gap-3">
                                                         <div className="h-1 w-6 rounded-full bg-slate-900" />
-                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Enterprise Context</h4>
+                                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Firm Details</h4>
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Active Law Firm</label>
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Law Firm Name</label>
                                                         <input type="text" value={form.firm} onChange={e => setForm(f => ({ ...f, firm: e.target.value }))} className="w-full bg-slate-50 border border-slate-100 text-slate-900 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-slate-100 transition-all font-bold text-sm" />
                                                     </div>
                                                     <div>
@@ -240,7 +250,7 @@ export default function SettingsPage() {
                                             
                                             <div className="mt-12 flex justify-end">
                                                 <button onClick={handleSaveProfile} className="px-12 py-5 bg-black text-white text-[11px] font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-slate-800 transition-all shadow-xl">
-                                                    {saved ? 'Matrix Synchronized' : 'Update Identity'}
+                                                    {saved ? 'Saved Successfully' : 'Save Changes'}
                                                 </button>
                                             </div>
                                          </div>
@@ -255,12 +265,12 @@ export default function SettingsPage() {
                                          <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20" />
                                          <div className="relative z-10 flex flex-col md:flex-row items-center gap-12">
                                             <div className="flex-1 space-y-4">
-                                                <span className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-500">Active Ecosystem</span>
-                                                <h3 className="text-4xl font-black uppercase tracking-tighter">{user?.subscription} Matrix</h3>
-                                                <p className="text-slate-400 max-w-sm text-sm font-medium leading-relaxed">Your firm is currently utilizing the {user?.subscription} architecture, billed on a {user?.subscriptionPeriod || 'Monthly'} cycle.</p>
+                                                <span className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-500">Current Plan</span>
+                                                <h3 className="text-4xl font-black uppercase tracking-tighter">{user?.subscription} Plan</h3>
+                                                <p className="text-slate-400 max-w-sm text-sm font-medium leading-relaxed">Your firm is currently on the {user?.subscription} plan, billed {user?.subscriptionPeriod || 'Monthly'}.</p>
                                             </div>
                                             <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-[32px] w-full md:w-80">
-                                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Upcoming Synchronization</p>
+                                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Next Billing Date</p>
                                                 <p className="text-3xl font-black tracking-tight">{nextBillingDate}</p>
                                                 <div className="h-1 w-12 bg-white/20 rounded-full mt-6" />
                                             </div>
@@ -271,7 +281,7 @@ export default function SettingsPage() {
                                         <div className="bg-slate-100 p-1.5 rounded-[22px] border border-slate-200 flex gap-2">
                                             <button onClick={() => setIsYearly(false)} className={clsx('px-10 py-3 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all', !isYearly ? 'bg-white text-slate-900 shadow-md border border-slate-200/50' : 'text-slate-400 hover:text-slate-900')}>Monthly Plan</button>
                                             <button onClick={() => setIsYearly(true)} className={clsx('px-10 py-3 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3', isYearly ? 'bg-white text-slate-900 shadow-md border border-slate-200/50' : 'text-slate-400 hover:text-slate-900')}>
-                                                Annual Protocol <span className="text-[8px] bg-emerald-500 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter font-black">Efficiency -20%</span>
+                                                Yearly Plan <span className="text-[8px] bg-emerald-500 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter font-black">Save 20%</span>
                                             </button>
                                         </div>
                                     </div>
@@ -341,11 +351,11 @@ export default function SettingsPage() {
 
                                          <div className="space-y-4">
                                             {Object.entries({
-                                                documentApproved: { label: 'Artifact Approval', desc: 'Instant signal upon judicial or internal document authentication.' },
-                                                filingUpdates:    { label: 'Ledger Updates', desc: 'Real-time telemetry for all procedural submission states.' },
-                                                aiAlerts:         { label: 'Intelligence Insight', desc: 'AI-detected clause conflicts and procedural risks.' },
-                                                financialReports: { label: 'Remittance Summary', desc: 'Weekly financial flow and billing trajectory reports.' },
-                                                weeklyDigest:     { label: 'Operational Digest', desc: 'Consolidated summary of firm activity every 168 hours.' },
+                                                documentApproved: { label: 'Document Revisions', desc: 'Get an alert when a document is approved.' },
+                                                filingUpdates:    { label: 'Filing Updates', desc: 'Live updates on all your submitted court filings.' },
+                                                aiAlerts:         { label: 'AI Alerts', desc: 'Notifies you when AI spots risks in your contracts.' },
+                                                financialReports: { label: 'Billing Reports', desc: 'Weekly summary of your revenue and invoices.' },
+                                                weeklyDigest:     { label: 'Weekly Summary', desc: 'Email digest of your firm activity at the end of the week.' },
                                             }).map(([key, { label, desc }]) => (
                                                 <div key={key} className="flex items-center justify-between p-6 bg-slate-50 border border-slate-100 rounded-[28px] hover:bg-white hover:border-slate-300 hover:shadow-xl transition-all cursor-pointer group">
                                                     <div>
@@ -375,7 +385,7 @@ export default function SettingsPage() {
                                         <div className="relative z-10">
                                             <div className="flex items-center gap-3 mb-10">
                                                 <div className="h-1 w-8 rounded-full bg-slate-900" />
-                                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Authentication Key Rotation</h4>
+                                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Password Settings</h4>
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
@@ -385,11 +395,11 @@ export default function SettingsPage() {
                                                         <input type="password" placeholder="••••••••" value={pwForm.current} onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))} className="w-full bg-slate-50 border border-slate-100 text-slate-900 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-slate-100 transition-all font-bold text-sm" />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">New Protocol Key</label>
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">New Password</label>
                                                         <input type="password" placeholder="••••••••" value={pwForm.next} onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))} className="w-full bg-slate-50 border border-slate-100 text-slate-900 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-slate-100 transition-all font-bold text-sm" />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Verify Protocol Key</label>
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Confirm New Password</label>
                                                         <input type="password" placeholder="••••••••" value={pwForm.confirm} onChange={e => setPwForm(p => ({ ...p, confirm: e.target.value }))} className="w-full bg-slate-50 border border-slate-100 text-slate-900 rounded-2xl py-4 px-6 outline-none focus:ring-4 focus:ring-slate-100 transition-all font-bold text-sm" />
                                                     </div>
                                                 </div>
@@ -440,8 +450,8 @@ export default function SettingsPage() {
                                                     <HiSparkles className="h-5 w-5 text-white" />
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-xl font-black text-slate-900 uppercase">Multi-Model Intelligence Hub</h3>
-                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Deploy plural neural engines for maximum procedural accuracy</p>
+                                                    <h3 className="text-xl font-black text-slate-900 uppercase">AI Models Setup</h3>
+                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Set up API keys for generating documents using AI</p>
                                                 </div>
                                             </div>
 
@@ -480,7 +490,7 @@ export default function SettingsPage() {
                                                                     <div className="space-y-0.5">
                                                                         <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest leading-none">{ai.label}</p>
                                                                         <a href={ai.link} target="_blank" rel="noreferrer" className="text-[8px] font-black text-slate-400 hover:text-black uppercase tracking-[0.15em] transition-all flex items-center gap-1 group/link">
-                                                                            Initialize Key <HiArrowRight className="h-2 w-2 group-hover/link:translate-x-1 transition-transform" />
+                                                                            Get API Key <HiArrowRight className="h-2 w-2 group-hover/link:translate-x-1 transition-transform" />
                                                                         </a>
                                                                     </div>
                                                                 </div>
@@ -512,12 +522,12 @@ export default function SettingsPage() {
                                                 <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -mr-16 -mb-16" />
                                                 <div className="space-y-2 relative z-10">
                                                     <h4 className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-2">
-                                                        <HiShieldCheck className="h-4 w-4 text-emerald-400" /> Intelligence Redundancy Active
+                                                        <HiShieldCheck className="h-4 w-4 text-emerald-400" /> AI Failover Active
                                                     </h4>
-                                                    <p className="text-[10px] font-medium text-slate-500 max-w-sm leading-relaxed">The collective neurals are synchronized. If a primary engine fails, the system auto-shifts to the next authorized node.</p>
+                                                    <p className="text-[10px] font-medium text-slate-500 max-w-sm leading-relaxed">If one AI provider goes offline, the system will automatically use the next active API to process your documents without interruption.</p>
                                                 </div>
                                                 <button onClick={handleSaveAiConfig} disabled={aiSaving} className="w-full md:w-auto px-12 py-5 bg-white text-black text-[11px] font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-slate-100 transition-all shadow-[0_20px_50px_rgba(255,255,255,0.1)] disabled:opacity-50 relative z-10">
-                                                    {aiSaving ? 'Synchronizing Neurals...' : 'Commit Intelligence Hub'}
+                                                    {aiSaving ? 'Saving...' : 'Save AI Settings'}
                                                 </button>
                                             </div>
                                          </div>
@@ -577,10 +587,10 @@ export default function SettingsPage() {
                                                             </div>
                                                             <div className="flex gap-3">
                                                                 <button onClick={() => handleReject(u.id, u.name)} className="px-8 py-3 text-[10px] font-black text-red-500 uppercase tracking-widest border border-red-50 hover:bg-red-500 hover:text-white rounded-xl transition-all">
-                                                                    Abort
+                                                                    Reject User
                                                                 </button>
                                                                 <button onClick={() => handleApprove(u.id, u.name)} className="px-8 py-3 text-[10px] font-black text-white bg-black hover:bg-emerald-600 rounded-xl transition-all shadow-lg">
-                                                                    Authorize Node
+                                                                    Approve User
                                                                 </button>
                                                             </div>
                                                         </motion.div>

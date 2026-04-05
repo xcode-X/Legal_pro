@@ -2,7 +2,7 @@
  * BillingPage — High-end professional financial dashboard for legal practices.
  * Creative, professional, and built with modern legal SaaS aesthetics.
  */
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
     HiCreditCard, HiTrendingUp, HiDocumentDuplicate,
@@ -15,6 +15,8 @@ import Modal from '../components/ui/Modal'
 import useToastStore from '../store/useToastStore'
 import { format } from 'date-fns'
 import clsx from 'clsx'
+import { db } from '../firebase'
+import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore'
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -35,22 +37,24 @@ export default function BillingPage() {
     const [showNewInvoice, setShowNewInvoice] = useState(false)
     const [newInvoice, setNewInvoice] = useState(EMPTY_INVOICE)
 
-    const [invoices, setInvoices] = useState([
-        { id: 'INV-2026-001', client: 'Acme Corp Liberia', amount: 1500.00, document: 'Service Agreement', date: '2024-03-25', status: 'Paid' },
-        { id: 'INV-2026-002', client: 'Tech Solutions Ltd.', amount: 450.00, document: 'NDA Preparation', date: '2024-03-28', status: 'Unpaid' },
-        { id: 'INV-2026-003', client: 'Monrovia Imports', amount: 2300.00, document: 'Property Deed Filing', date: '2024-04-01', status: 'Unpaid' },
-        { id: 'INV-2026-004', client: 'Michael B. Davies', amount: 125.00, document: 'Affidavit of Support', date: '2024-03-15', status: 'Overdue' },
-        { id: 'INV-2026-005', client: 'Elena K. Howard', amount: 800.00, document: 'Employment Contract', date: '2024-04-02', status: 'Paid' },
-    ])
+    const [invoices, setInvoices] = useState([])
+
+    useEffect(() => {
+        const unsub = onSnapshot(collection(db, 'invoices'), (snapshot) => {
+            const invs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+            setInvoices(invs.sort((a, b) => new Date(b.date) - new Date(a.date)))
+        })
+        return () => unsub()
+    }, [])
 
     const paidTotal = invoices.filter(i => i.status === 'Paid').reduce((a, b) => a + b.amount, 0)
     const pendingTotal = invoices.filter(i => i.status === 'Unpaid').reduce((a, b) => a + b.amount, 0)
     const overdueTotal = invoices.filter(i => i.status === 'Overdue').reduce((a, b) => a + b.amount, 0)
 
     const stats = [
-        { label: 'Verified Revenue', value: paidTotal, icon: HiShieldCheck, gradient: 'from-slate-900 via-slate-800 to-slate-900', text: 'text-white' },
-        { label: 'Pending Liquidity', value: pendingTotal, icon: HiClock, gradient: 'from-white to-slate-50', text: 'text-slate-900', border: 'border-slate-100' },
-        { label: 'Arrears Protocol', value: overdueTotal, icon: HiExclamationCircle, gradient: 'from-white to-slate-50', text: 'text-red-600', border: 'border-slate-100' },
+        { label: 'Total Paid', value: paidTotal, icon: HiShieldCheck, gradient: 'from-slate-900 via-slate-800 to-slate-900', text: 'text-white' },
+        { label: 'Pending Payment', value: pendingTotal, icon: HiClock, gradient: 'from-white to-slate-50', text: 'text-slate-900', border: 'border-slate-100' },
+        { label: 'Overdue', value: overdueTotal, icon: HiExclamationCircle, gradient: 'from-white to-slate-50', text: 'text-red-600', border: 'border-slate-100' },
     ]
 
     const filtered = invoices.filter(inv => {
@@ -60,20 +64,33 @@ export default function BillingPage() {
         return matchesTab && matchesSearch
     })
 
-    const handleAddInvoice = () => {
+    const handleAddInvoice = async () => {
         if (!newInvoice.client.trim() || !newInvoice.document.trim() || !newInvoice.amount) return
-        const id = `INV-2026-${Math.floor(100 + Math.random() * 900)}`
-        setInvoices(prev => [{
-            id,
-            client: newInvoice.client,
-            document: newInvoice.document,
-            amount: parseFloat(newInvoice.amount),
-            date: new Date().toISOString(),
-            status: newInvoice.status,
-        }, ...prev])
-        setNewInvoice(EMPTY_INVOICE)
-        setShowNewInvoice(false)
-        addToast(`Financial record for ${newInvoice.client} initialized.`, 'success')
+        const id = `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
+        
+        try {
+            await setDoc(doc(db, 'invoices', id), {
+                client: newInvoice.client,
+                document: newInvoice.document,
+                amount: parseFloat(newInvoice.amount),
+                date: new Date().toISOString(),
+                status: newInvoice.status,
+            })
+            setNewInvoice(EMPTY_INVOICE)
+            setShowNewInvoice(false)
+            addToast(`Financial record for ${newInvoice.client} initialized.`, 'success')
+        } catch (e) {
+            addToast("Failed to create invoice.", "error")
+        }
+    }
+    
+    const handleDeleteInvoice = async (id) => {
+        try {
+            await deleteDoc(doc(db, 'invoices', id))
+            addToast("Invoice deleted.", "info")
+        } catch (e) {
+            addToast("Failed to delete invoice.", "error")
+        }
     }
 
     const TABS = ['All', 'Paid', 'Unpaid', 'Overdue']
@@ -90,7 +107,7 @@ export default function BillingPage() {
                     </div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase">Billing & Invoicing</h1>
                     <p className="text-slate-500 max-w-md text-sm font-medium leading-relaxed">
-                        Precision tracking of firm-wide revenue streams, automated legal fee distribution, and real-time arrears monitoring.
+                        Track your firm's revenue, monitor unpaid invoices, and manage payments all in one place.
                     </p>
                 </div>
                 
@@ -109,7 +126,7 @@ export default function BillingPage() {
                         onClick={() => setShowNewInvoice(true)} 
                         className="w-full sm:w-auto py-4 px-8 bg-black text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-slate-800 hover:scale-[1.03] transition-all shadow-2xl flex items-center justify-center gap-3"
                     >
-                        <HiPlus className="h-4 w-4" /> Initialize Invoice
+                        <HiPlus className="h-4 w-4" /> New Invoice
                     </button>
                 </div>
             </motion.div>
@@ -162,7 +179,7 @@ export default function BillingPage() {
                     </div>
                     <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                         <span className="h-1.5 w-1.5 rounded-full bg-slate-900 opacity-20" />
-                        Live Synchronized Ledger 2026.4
+                        Live Invoice Data
                     </div>
                 </div>
 
@@ -171,10 +188,10 @@ export default function BillingPage() {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-slate-50 border-b border-slate-100">
-                                    <th className="py-7 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest">Invoicing Identity</th>
-                                    <th className="py-7 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Procedural Artifact</th>
-                                    <th className="py-7 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Financial Scope</th>
-                                    <th className="py-7 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status Badge</th>
+                                    <th className="py-7 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Name</th>
+                                    <th className="py-7 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Document</th>
+                                    <th className="py-7 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
+                                    <th className="py-7 px-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
                                     <th className="py-7 px-10 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -226,7 +243,7 @@ export default function BillingPage() {
                                                     <button className="h-10 w-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-black hover:text-white transition-all shadow-sm">
                                                         <HiDownload className="h-4 w-4" />
                                                     </button>
-                                                    <button className="h-10 w-10 rounded-full bg-white border border-slate-100 flex items-center justify-center text-slate-300 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all shadow-sm">
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteInvoice(inv.id); }} className="h-10 w-10 rounded-full bg-white border border-slate-100 flex items-center justify-center text-slate-300 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all shadow-sm">
                                                         <HiTrash className="h-4 w-4" />
                                                     </button>
                                                 </div>
@@ -254,7 +271,7 @@ export default function BillingPage() {
             <Modal
                 isOpen={showNewInvoice}
                 onClose={() => { setShowNewInvoice(false); setNewInvoice(EMPTY_INVOICE) }}
-                title="Protocol Architect — Financial Invoice"
+                title="Create New Invoice"
                 size="md"
                 footer={
                     <div className="flex w-full justify-between items-center px-4">
@@ -264,7 +281,7 @@ export default function BillingPage() {
                             disabled={!newInvoice.client.trim() || !newInvoice.document.trim() || !newInvoice.amount} 
                             className="px-10 py-4 bg-black text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-slate-800 transition-all shadow-[0_20px_40px_rgba(0,0,0,0.15)] disabled:opacity-30"
                          >
-                            Initialize Record
+                            Create Invoice
                          </button>
                     </div>
                 }

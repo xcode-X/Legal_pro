@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
     HiCalendar, HiClock, HiOutlineLocationMarker, HiUserGroup, 
@@ -9,6 +9,8 @@ import { format, addDays, startOfMonth, getDay, getDaysInMonth, isSameDay } from
 import Modal from '../components/ui/Modal'
 import useToastStore from '../store/useToastStore'
 import clsx from 'clsx'
+import { db } from '../firebase'
+import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore'
 
 const EVENT_TYPES = ['Court', 'Meeting', 'Deadline', 'Internal']
 
@@ -38,13 +40,15 @@ export default function CalendarPage() {
     const [form, setForm] = useState(EMPTY_EVENT)
     const [selectedDay, setSelectedDay] = useState(null)
 
-    const [events, setEvents] = useState([
-        { id: 1, title: 'Court Hearing: River v. Monco', date: new Date(), time: '09:00 AM', location: 'Circuit Court, Room 2B', type: 'Court', participants: 'J. Doe, L. Smith' },
-        { id: 2, title: 'Client Meeting - NDAs', date: new Date(), time: '02:00 PM', location: 'Conference Room A', type: 'Meeting', participants: 'Tech Solutions Ltd.' },
-        { id: 3, title: 'Filing Deadline: Property Deed', date: addDays(new Date(), 2), time: '11:59 PM', location: 'Ministry of Lands', type: 'Deadline', participants: 'Real Estate Team' },
-        { id: 4, title: 'Arbitration Prep', date: addDays(new Date(), 3), time: '10:00 AM', location: 'Main Office', type: 'Internal', participants: 'Partners' },
-        { id: 5, title: 'Deposition', date: addDays(new Date(), 5), time: '01:00 PM', location: 'Downtown Offices', type: 'Court', participants: 'Howard Case' },
-    ])
+    const [events, setEvents] = useState([])
+
+    useEffect(() => {
+        const unsub = onSnapshot(collection(db, 'events'), (snapshot) => {
+            const evts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+            setEvents(evts.sort((a, b) => new Date(a.date) - new Date(b.date)))
+        })
+        return () => unsub()
+    }, [])
 
     // Build proper calendar grid
     const today = new Date()
@@ -63,16 +67,25 @@ export default function CalendarPage() {
         })
     }
 
-    const handleAddEvent = () => {
+    const handleAddEvent = async () => {
         if (!form.title.trim()) return
         const date = selectedDay
             ? new Date(today.getFullYear(), today.getMonth(), selectedDay)
             : new Date()
-        setEvents(prev => [{ ...form, id: Date.now(), date }, ...prev])
-        setForm(EMPTY_EVENT)
-        setSelectedDay(null)
-        setShowNewEvent(false)
-        addToast(`Event "${form.title}" added to calendar!`, 'success')
+        
+        try {
+            const newId = `evt_${Date.now()}`
+            await setDoc(doc(db, 'events', newId), {
+                ...form,
+                date: date.toISOString()
+            })
+            setForm(EMPTY_EVENT)
+            setSelectedDay(null)
+            setShowNewEvent(false)
+            addToast(`Event "${form.title}" added to calendar!`, 'success')
+        } catch (e) {
+            addToast("Failed to add event.", "error")
+        }
     }
 
     const openNewEventForDay = (day) => {
@@ -84,9 +97,13 @@ export default function CalendarPage() {
 
     const [viewingEvent, setViewingEvent] = useState(null)
 
-    const handleDeleteEvent = (id) => {
-        setEvents(prev => prev.filter(e => e.id !== id))
-        addToast("Engagement record has been purged from chronos.", "info")
+    const handleDeleteEvent = async (id) => {
+        try {
+            await deleteDoc(doc(db, 'events', id))
+            addToast("Event has been deleted.", "info")
+        } catch (e) {
+            addToast("Failed to delete event.", "error")
+        }
     }
 
     return (
@@ -98,9 +115,9 @@ export default function CalendarPage() {
                 <div className="h-16 w-16 bg-black rounded-full mx-auto flex items-center justify-center mb-5 shadow-2xl ring-8 ring-slate-50">
                     <HiCalendar className="h-7 w-7 text-white" />
                 </div>
-                <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-3 uppercase">Court & Filing Calendar</h1>
+                <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-3 uppercase">Calendar</h1>
                 <p className="text-slate-500 max-w-xl mx-auto text-sm font-medium leading-relaxed">
-                    Centrally manage judicial deadlines, procedural filings, and client consultations with rigorous synchronized precision.
+                    Manage court dates, meetings, and deadlines all in one centralized place.
                 </p>
                 
                 <div className="mt-8 flex items-center justify-center gap-3">
@@ -128,7 +145,7 @@ export default function CalendarPage() {
                 <div className="flex flex-col sm:flex-row items-center justify-between mb-12 relative z-10 gap-6">
                     <div>
                         <h2 className="font-black text-slate-900 text-3xl tracking-tight leading-none uppercase">{format(today, 'MMMM yyyy')}</h2>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-3">Monthly Judicial Scheduling Overview</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-3">Monthly Overview</p>
                     </div>
                     <div className="flex gap-3 items-center">
                         <div className="flex gap-2 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100">
@@ -145,7 +162,7 @@ export default function CalendarPage() {
                             onClick={() => { setSelectedDay(null); setShowNewEvent(true) }}
                             className="py-4 px-8 bg-black text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-slate-800 hover:scale-105 transition-all shadow-2xl flex items-center gap-2"
                         >
-                            <HiOutlinePlus className="h-4 w-4" /> Schedule New Entry
+                            <HiOutlinePlus className="h-4 w-4" /> Add New Event
                         </button>
                     </div>
                 </div>
@@ -193,7 +210,7 @@ export default function CalendarPage() {
                          <div className="h-10 w-10 bg-black rounded-full flex items-center justify-center shadow-lg">
                             <HiClock className="h-5 w-5 text-white" />
                         </div>
-                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Detailed Chronological Timeline</h3>
+                        <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">List of Events</h3>
                     </div>
                 </div>
 
@@ -202,9 +219,9 @@ export default function CalendarPage() {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-slate-50/50 border-b border-slate-100">
-                                    <th className="py-6 px-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Procedural Event</th>
-                                    <th className="py-6 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Protocol Date</th>
-                                    <th className="py-6 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Commencement</th>
+                                    <th className="py-6 px-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Event Name</th>
+                                    <th className="py-6 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Date</th>
+                                    <th className="py-6 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Time</th>
                                     <th className="py-6 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status Badge</th>
                                     <th className="py-6 px-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                                 </tr>
@@ -214,7 +231,7 @@ export default function CalendarPage() {
                                     <tr>
                                         <td colSpan={5} className="py-32 text-center">
                                             <HiCalendar className="h-12 w-12 mx-auto mb-4 text-slate-200" />
-                                            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">No immediate engagements detected</p>
+                                            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">No events scheduled</p>
                                         </td>
                                     </tr>
                                 ) : (
@@ -282,12 +299,12 @@ export default function CalendarPage() {
             <Modal
                 isOpen={!!viewingEvent}
                 onClose={() => setViewingEvent(null)}
-                title="Engagement Intelligence Protocol"
+                title="Event Details"
                 size="md"
                 footer={
                     <div className="flex w-full justify-between items-center px-4">
-                         <button onClick={() => setViewingEvent(null)} className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors">Terminate View</button>
-                         <button onClick={() => { handleDeleteEvent(viewingEvent.id); setViewingEvent(null) }} className="px-8 py-3 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-700 transition-all shadow-lg">Archive Event</button>
+                         <button onClick={() => setViewingEvent(null)} className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-colors">Close</button>
+                         <button onClick={() => { handleDeleteEvent(viewingEvent.id); setViewingEvent(null) }} className="px-8 py-3 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-700 transition-all shadow-lg">Delete Event</button>
                     </div>
                 }
             >
@@ -309,7 +326,7 @@ export default function CalendarPage() {
                             <div className="bg-slate-50 p-6 rounded-[28px] border border-slate-100">
                                 <div className="flex items-center gap-2 mb-3">
                                     <HiClock className="h-4 w-4 text-slate-400" />
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Temporal Detail</p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Date & Time</p>
                                 </div>
                                 <p className="text-sm font-black text-slate-900">{format(viewingEvent.date, 'MMMM d, yyyy')}</p>
                                 <p className="text-xs font-bold text-slate-500 mt-1">{viewingEvent.time}</p>
@@ -317,10 +334,9 @@ export default function CalendarPage() {
                             <div className="bg-slate-50 p-6 rounded-[28px] border border-slate-100">
                                 <div className="flex items-center gap-2 mb-3">
                                     <HiOutlineLocationMarker className="h-4 w-4 text-slate-400" />
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Venue Details</p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Location</p>
                                 </div>
                                 <p className="text-sm font-black text-slate-900 truncate">{viewingEvent.location || 'Distributed Office'}</p>
-                                <p className="text-xs font-bold text-slate-500 mt-1">Confirmed Path</p>
                             </div>
                         </div>
 
@@ -329,7 +345,7 @@ export default function CalendarPage() {
                              <div className="relative z-10">
                                 <div className="flex items-center gap-3 mb-6">
                                     <HiUserGroup className="h-5 w-5 text-indigo-400" />
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Authorized Participants</p>
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Attendees</p>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     {(viewingEvent.participants || 'General Counsel').split(',').map((p, i) => (
@@ -348,18 +364,18 @@ export default function CalendarPage() {
             <Modal
                 isOpen={showNewEvent}
                 onClose={() => { setShowNewEvent(false); setForm(EMPTY_EVENT); setSelectedDay(null) }}
-                title={selectedDay ? `New Engagement Entry — ${format(new Date(today.getFullYear(), today.getMonth(), selectedDay), 'MMM d, yyyy')}` : 'Schedule New Engagement'}
+                title={selectedDay ? `New Event — ${format(new Date(today.getFullYear(), today.getMonth(), selectedDay), 'MMM d, yyyy')}` : 'Add New Event'}
                 size="md"
                 footer={
                     <div className="flex w-full justify-between items-center px-4">
-                         <button onClick={() => { setShowNewEvent(false); setForm(EMPTY_EVENT); setSelectedDay(null) }} className="text-xs font-bold uppercase text-slate-400 hover:text-slate-600 transition-colors">Discard Draft</button>
-                         <button onClick={handleAddEvent} disabled={!form.title.trim()} className="px-10 py-4 bg-black text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-slate-800 transition-all shadow-xl disabled:opacity-50">Create Entry</button>
+                         <button onClick={() => { setShowNewEvent(false); setForm(EMPTY_EVENT); setSelectedDay(null) }} className="text-xs font-bold uppercase text-slate-400 hover:text-slate-600 transition-colors">Cancel</button>
+                         <button onClick={handleAddEvent} disabled={!form.title.trim()} className="px-10 py-4 bg-black text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-slate-800 transition-all shadow-xl disabled:opacity-50">Create Event</button>
                     </div>
                 }
             >
                 <div className="space-y-6 pt-2">
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Event Identification</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Event Name</label>
                         <input 
                             type="text" 
                             value={form.title} 
@@ -370,7 +386,7 @@ export default function CalendarPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-6">
                         <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Case Category</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Event Type</label>
                             <select 
                                 value={form.type} 
                                 onChange={e => setForm(p => ({ ...p, type: e.target.value }))} 
@@ -380,7 +396,7 @@ export default function CalendarPage() {
                             </select>
                         </div>
                         <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Commencement Time</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Time</label>
                             <input 
                                 type="text" 
                                 value={form.time} 
@@ -391,7 +407,7 @@ export default function CalendarPage() {
                         </div>
                     </div>
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Venue / Physical Location</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block ml-1">Location</label>
                         <input 
                             type="text" 
                             value={form.location} 

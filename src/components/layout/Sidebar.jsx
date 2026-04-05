@@ -7,7 +7,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
     HiHome, HiDocumentText, HiTemplate, HiClipboardList,
     HiCog, HiLogout, HiChevronLeft, HiChevronRight,
-    HiSparkles, HiScale, HiUserGroup, HiCreditCard, HiCalendar
+    HiSparkles, HiScale, HiUserGroup, HiCreditCard, HiCalendar, HiSupport
 } from 'react-icons/hi'
 import useAuthStore from '../../store/useAuthStore'
 import clsx from 'clsx'
@@ -21,6 +21,7 @@ const NAV_ITEMS = [
     { label: 'Calendar', to: '/calendar', icon: HiCalendar },
     { label: 'Filings', to: '/filings', icon: HiClipboardList },
     { label: 'Billing', to: '/billing', icon: HiCreditCard },
+    { label: 'Support', to: '/support', icon: HiSupport },
     { label: 'Settings', to: '/settings', icon: HiCog },
 ]
 

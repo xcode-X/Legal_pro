@@ -134,7 +134,9 @@ export default function DashboardPage() {
                 {/* Page heading */}
                 <motion.div variants={item} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                        <h1 className="page-title">{getGreeting()}, {user?.name?.split(' ')[0] || 'Admin'} 👋</h1>
+                        <h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-gray-900 via-primary-800 to-primary-600 tracking-tight">
+                            {getGreeting()}, {user?.name?.split(' ')[0] || 'Admin'} 👋
+                        </h1>
                         <p className="page-subtitle flex items-center gap-2 mt-1">
                             <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border border-gray-200">
                                 {format(currentTime, 'EEEE, MMMM do yyyy | hh:mm a')}

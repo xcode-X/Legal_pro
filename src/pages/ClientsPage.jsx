@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
     HiUserGroup, HiSearch, HiOutlineMail, HiOutlinePhone,
@@ -6,6 +6,8 @@ import {
 } from 'react-icons/hi'
 import Modal from '../components/ui/Modal'
 import useToastStore from '../store/useToastStore'
+import { db } from '../firebase'
+import { collection, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore'
 
 const EMPTY_CLIENT = {
     name: '', contact: '', email: '', phone: '', type: 'Corporate', status: 'Active',
@@ -30,26 +32,32 @@ export default function ClientsPage() {
     const [viewClient, setViewClient] = useState(null)
     const [form, setForm] = useState(EMPTY_CLIENT)
 
-    const [clients, setClients] = useState([
-        { id: 1, name: 'Acme Corp Liberia', contact: 'John Doe', email: 'jdoe@acme.lr', phone: '+231 77 000 1111', status: 'Active', type: 'Corporate' },
-        { id: 2, name: 'Tech Solutions Ltd.', contact: 'Sarah Smith', email: 'sarah@techsol.lr', phone: '+231 88 222 3333', status: 'Active', type: 'Corporate' },
-        { id: 3, name: 'Michael B. Davies', contact: 'M. Davies', email: 'mdavies@gmail.com', phone: '+231 77 444 5555', status: 'Pending', type: 'Individual' },
-        { id: 4, name: 'Monrovia Imports', contact: 'David Johnson', email: 'info@monroviaimports.com', phone: '+231 88 999 8888', status: 'Inactive', type: 'Corporate' },
-        { id: 5, name: 'Elena K. Howard', contact: 'E. Howard', email: 'ehoward@yahoo.com', phone: '+231 77 555 6666', status: 'Active', type: 'Individual' },
-    ])
+    const [clients, setClients] = useState([])
+
+    useEffect(() => {
+        const unsub = onSnapshot(collection(db, 'clients'), (snapshot) => {
+            const clts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+            setClients(clts)
+        })
+        return () => unsub()
+    }, [])
 
     const filtered = clients.filter(c =>
         c.name.toLowerCase().includes(search.toLowerCase()) ||
         c.email.toLowerCase().includes(search.toLowerCase())
     )
 
-    const handleAddClient = () => {
+    const handleAddClient = async () => {
         if (!form.name.trim() || !form.email.trim()) return
-        const newClient = { ...form, id: Date.now() }
-        setClients(prev => [...prev, newClient])
-        setForm(EMPTY_CLIENT)
-        setShowNewClient(false)
-        addToast(`Client "${form.name}" added!`, 'success')
+        
+        try {
+            await addDoc(collection(db, 'clients'), form)
+            setForm(EMPTY_CLIENT)
+            setShowNewClient(false)
+            addToast(`Client "${form.name}" added!`, 'success')
+        } catch (e) {
+            addToast("Failed to add client.", "error")
+        }
     }
 
     const getAvatarSrc = (client) => {
