@@ -51,10 +51,14 @@ export default function QuickActionsSidebar() {
         <div className="fixed top-1/3 right-0 z-50 flex items-start drop-shadow-2xl">
             <button 
                 onClick={() => setIsActionsOpen(!isActionsOpen)}
-                className="bg-white text-gray-700 px-3 py-6 rounded-l-2xl shadow-lg border border-r-0 border-gray-200 flex flex-col items-center gap-3 hover:bg-gray-50 transition-colors relative"
+                className={`px-3 py-6 rounded-l-2xl shadow-2xl border border-r-0 flex flex-col items-center gap-3 transition-all duration-300 relative group overflow-hidden
+                    ${isActionsOpen 
+                        ? 'bg-slate-900 border-slate-800 translate-x-0 shadow-none' 
+                        : 'bg-slate-950 border-slate-800 hover:-translate-x-2 hover:bg-black hover:shadow-cyan-500/30'}`}
             >
-                <FcSettings className={`h-6 w-6 transition-transform duration-300 ${isActionsOpen ? 'rotate-180' : ''}`} />
-                <span style={{ writingMode: 'vertical-rl' }} className="text-[10px] font-bold tracking-widest rotate-180 uppercase text-gray-500">
+                <div className="absolute inset-0 bg-cyan-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                <FcSettings className={`h-6 w-6 relative z-10 transition-all duration-500 ${isActionsOpen ? 'rotate-180' : 'group-hover:rotate-90 scale-110'}`} />
+                <span style={{ writingMode: 'vertical-rl' }} className="text-[9px] font-black tracking-[0.3em] rotate-180 uppercase text-slate-400 group-hover:text-cyan-400 transition-colors relative z-10">
                     {isActionsOpen ? 'CLOSE' : 'ACTIONS'}
                 </span>
             </button>

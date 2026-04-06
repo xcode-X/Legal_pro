@@ -30,8 +30,27 @@ const useAuthStore = create(
 
             // Firestore unsubscription functions to clean up listeners
             _unsubUsers: null,
+            _unsubCurrentUser: null,
 
             confirmationResult: null,
+
+            /**
+             * Attach a real-time listener to the logged-in user profile 
+             * so that modifications (like Admin approval) instantly mutate state.
+             */
+            _startListeningToCurrentUser: (uid) => {
+                const state = get()
+                if (state._unsubCurrentUser) state._unsubCurrentUser()
+
+                const unsub = onSnapshot(doc(db, 'users', uid), (docSnap) => {
+                    if (docSnap.exists()) {
+                        const userData = docSnap.data()
+                        set({ user: { id: uid, ...userData }})
+                        if (userData.role === 'Admin') get()._startSyncingUsers()
+                    }
+                })
+                set({ _unsubCurrentUser: unsub })
+            },
 
             /**
              * Login with Google
@@ -61,7 +80,7 @@ const useAuthStore = create(
                     } else {
                         const userData = userDoc.data()
                         set({ user: { id: fbUser.uid, ...userData }, isAuthenticated: true, isLoading: false })
-                        if (userData.role === 'Admin') get()._startSyncingUsers()
+                        get()._startListeningToCurrentUser(fbUser.uid)
                         return { success: true }
                     }
                 } catch (error) {
@@ -118,11 +137,12 @@ const useAuthStore = create(
                         }
                         await setDoc(doc(db, 'users', fbUser.uid), newUser)
                         set({ user: { id: fbUser.uid, ...newUser }, isAuthenticated: true, isLoading: false, confirmationResult: null })
+                        get()._startListeningToCurrentUser(fbUser.uid)
                         return { success: true }
                     } else {
                         const userData = userDoc.data()
                         set({ user: { id: fbUser.uid, ...userData }, isAuthenticated: true, isLoading: false, confirmationResult: null })
-                        if (userData.role === 'Admin') get()._startSyncingUsers()
+                        get()._startListeningToCurrentUser(fbUser.uid)
                         return { success: true }
                     }
                 } catch (error) {
@@ -145,12 +165,7 @@ const useAuthStore = create(
                     if (userDoc.exists()) {
                         const userData = userDoc.data()
                         set({ user: { id: fbUser.uid, ...userData }, isAuthenticated: true, isLoading: false, error: null })
-                        
-                        // If admin, start syncing users
-                        if (userData.role === 'Admin') {
-                            get()._startSyncingUsers()
-                        }
-                        
+                        get()._startListeningToCurrentUser(fbUser.uid)
                         return { success: true }
                     } else {
                         set({ isLoading: false, error: 'User profile not found in database.' })
@@ -190,6 +205,8 @@ const useAuthStore = create(
                         isLoading: false,
                         error: null,
                     })
+                    
+                    get()._startListeningToCurrentUser(fbUser.uid)
                     return { success: true }
                 } catch (error) {
                     set({ isLoading: false, error: error.message })
@@ -226,7 +243,7 @@ const useAuthStore = create(
                         error: null,
                     })
                     
-                    get()._startSyncingUsers()
+                    get()._startListeningToCurrentUser(fbUser.uid)
 
                     return { success: true }
                 } catch (error) {
@@ -265,10 +282,6 @@ const useAuthStore = create(
             approveAccount: async (userId) => {
                 try {
                     await updateDoc(doc(db, 'users', userId), { accountStatus: 'active' })
-                    // user updates via snapshot, but we can locally update if it's the current user
-                    if (get().user?.id === userId) {
-                        set(state => ({ user: { ...state.user, accountStatus: 'active' } }))
-                    }
                 } catch (e) {
                     console.error("Failed to approve account:", e)
                 }
@@ -287,6 +300,7 @@ const useAuthStore = create(
             logout: async () => {
                 const state = get()
                 if (state._unsubUsers) state._unsubUsers()
+                if (state._unsubCurrentUser) state._unsubCurrentUser()
                 try {
                     await signOut(auth)
                 } catch(e) {}

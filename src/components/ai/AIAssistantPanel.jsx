@@ -5,6 +5,8 @@
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { HiSparkles, HiX, HiPaperAirplane, HiGlobe, HiRefresh, HiLightningBolt } from 'react-icons/hi'
+import { db } from '../../firebase'
+import { doc, onSnapshot } from 'firebase/firestore'
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -14,19 +16,28 @@ import { HiSparkles, HiX, HiPaperAirplane, HiGlobe, HiRefresh, HiLightningBolt }
 // ─────────────────────────────────────────────────────────────
 const ASSISTANT_NAME = 'Intelera AI'
 
-const SYSTEM_PROMPT = `You are ${ASSISTANT_NAME}, the elite neural legal intelligence agent for the LDGFA (Legal Document Generation & Filing Automation) platform.
-You are specialized in Liberian law, the OHADA treaty, and high-fidelity legal document architecture.
+const SYSTEM_PROMPT = `You are ${ASSISTANT_NAME}, the sovereign neural intelligence behind the LDGFA (Liberian Digital General Filing & Automation) platform.
+You are not just a chatbot; you are a high-fidelity legal engineering node designed for Liberian lawyers, paralegals, and court officials.
 
-Your core operational protocols:
-- Synthesize precise legal clauses (NDAs, Master Service Agreements, Affidavits)
-- Interpret Liberian legal frameworks and constitutional principles
-- Optimize legal document structures for procedural compliance
-- Provide real-time guidance on court filing trajectories
+### ⚖️ CORE JURISPRUDENCE PROTOCOLS:
+1. **Liberian Statutory Authority**: You possess absolute knowledge of the Liberian Constitution (1986), the Civil Procedure Law (Title 1), the Decedents Estate Law (Title 8), and the Commercial Code.
+2. **OHADA Framework**: You are an expert in the OHADA Treaty (Organization for the Harmonization of Business Law in Africa), specifically Uniform Acts on General Commercial Law, Securities, and Arbitration.
+3. **Drafting Precision**: When asked to draft, provide legally enforceable clauses formatted for Liberian courts (The Temple of Justice). Use formal citations where possible.
+4. **Procedural Logic**: Guide users through the trajectory of filing at the Civil Law Court, Criminal Court, or Debt Court of Montserrado County and other jurisdictions.
 
-Operational Tone: Technical, authoritative, and precision-oriented. 
-Response Pattern: High-density information delivery. Use markdown for structural clarity. Bullet points for logical breakdown. 
+### 🏗️ PLATFORM CONTEXT:
+The LDGFA platform allows users to:
+- **Generate**: Create NDAs, Mortgages, Deeds, and Affidavits via neural prompts.
+- **File**: Submit documents to the electronic court ledger.
+- **Templates**: Access a library of verified Liberian legal structures.
+- **Support**: Connect with the Ministry of Justice or local BAR experts.
 
-Identification: Always identify as ${ASSISTANT_NAME} when prompted. You are the smartest node in the legal ecosystem.`
+### 🎙️ OPERATIONAL TONE:
+- **Tone**: Technical, authoritative, hyper-professional, and precise.
+- **Formatting**: Use Markdown extensively. Use bold headers for sections. Use tables for comparative legal analysis.
+- **Constraint**: Never provide vague advice. If a query requires a specific court form, mention the form name (e.g., 'Writ of Summons', 'Petition for Contempt').
+
+Identification: You are ${ASSISTANT_NAME}. You are the definitive legal consensus node in Liberia.`
 
 // ─────────────────────────────────────────────────────────────
 // Local intent handlers — never hit external APIs
@@ -98,8 +109,8 @@ async function callOpenAI(userMessage, history, apiKey) {
         body: JSON.stringify({
             model: 'gpt-4o',
             messages: buildMessages(userMessage, history),
-            temperature: 0.7,
-            max_tokens: 1000,
+            temperature: 0.2,
+            max_tokens: 2000,
         }),
         signal: AbortSignal.timeout(25000),
     })
@@ -140,8 +151,8 @@ async function callDeepSeek(userMessage, history, apiKey) {
         body: JSON.stringify({
             model: 'deepseek-chat',
             messages: buildMessages(userMessage, history),
-            temperature: 0.7,
-            max_tokens: 1000,
+            temperature: 0.2,
+            max_tokens: 2000,
         }),
         signal: AbortSignal.timeout(25000),
     })
@@ -157,8 +168,8 @@ async function callGroqAI(userMessage, history, apiKey) {
         body: JSON.stringify({
             model: 'llama-3.1-8b-instant',
             messages: buildMessages(userMessage, history),
-            temperature: 0.7,
-            max_tokens: 1000,
+            temperature: 0.2,
+            max_tokens: 2000,
         }),
         signal: AbortSignal.timeout(20000),
     })
@@ -192,14 +203,14 @@ async function callGeminiAI(userMessage, history, apiKey) {
     return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
 }
 
-async function callPollinationsAI(userMessage, history) {
+async function callPollinationsAI(userMessage, history, modelAlias = 'openai') {
     // Generate a streamlined context string
     const historyContext = history.slice(-2).map(m => `[${m.role.toUpperCase()}]: ${m.text}`).join(' | ')
     const prompt = encodeURIComponent(`Legal AI Protocol: ${userMessage} | Context: ${historyContext}`)
     
     // Condensed system prompt for GET-trajectory to bypass payload limits
     const system = encodeURIComponent(`You are Intelera AI, a legal assistant for the LDGFA platform. Concise, technical, OHADA law expert.`)
-    const url = `https://text.pollinations.ai/${prompt}?model=openai&system=${system}`
+    const url = `https://text.pollinations.ai/${prompt}?model=${modelAlias}&system=${system}`
     
     const resp = await fetch(url, {
         method: 'GET',
@@ -215,9 +226,7 @@ async function callPollinationsAI(userMessage, history) {
 // ─────────────────────────────────────────────────────────────
 // Main dispatcher — reads config fresh every time
 // ─────────────────────────────────────────────────────────────
-async function getAIResponse(userMessage, history, selectedModel = 'auto') {
-    let aiConfig = {}
-    try { aiConfig = JSON.parse(localStorage.getItem('ldgfa_ai_config') || '{}') } catch { /* */ }
+async function getAIResponse(userMessage, history, selectedModel = 'auto', aiConfig = {}) {
 
     const local = getLocalResponse(userMessage)
     if (local) return { text: local, provider: 'local' }
@@ -255,7 +264,7 @@ async function getAIResponse(userMessage, history, selectedModel = 'auto') {
     }
 
     const tryPollinations = async () => {
-        const text = await callPollinationsAI(userMessage, history)
+        const text = await callPollinationsAI(userMessage, history, 'openai')
         return { text, provider: 'pollinations' }
     }
 
@@ -332,11 +341,22 @@ export default function AIAssistantPanel() {
     const bottomRef = useRef(null)
     const textareaRef = useRef(null)
 
-    // Synchronize available intelligence nodes with System Portfolio credentials
+    const [globalAiConfig, setGlobalAiConfig] = useState({})
+
+    // Listen to API config directly from Admin's live Firestore node
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, 'system', 'ai_config'), (docSnap) => {
+            if (docSnap.exists()) {
+                setGlobalAiConfig(docSnap.data())
+            }
+        })
+        return () => unsub()
+    }, [])
+
+    // Synchronize available intelligence nodes with real-time credentials
     useEffect(() => {
         if (isOpen) {
-            let aiConfig = {}
-            try { aiConfig = JSON.parse(localStorage.getItem('ldgfa_ai_config') || '{}') } catch { }
+            const aiConfig = globalAiConfig
             
             const agents = [
                 { id: 'auto', label: '✨ Neural Auto-Cascade', active: true },
@@ -349,7 +369,7 @@ export default function AIAssistantPanel() {
             ]
             setAvailableAgents(agents.filter(a => a.active))
         }
-    }, [isOpen])
+    }, [isOpen, globalAiConfig])
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -365,7 +385,7 @@ export default function AIAssistantPanel() {
         setIsTyping(true)
 
         try {
-            const { text, provider } = await getAIResponse(trimmed, messages, selectedModel)
+            const { text, provider } = await getAIResponse(trimmed, messages, selectedModel, globalAiConfig)
             setMessages(prev => [...prev, { role: 'assistant', text, ts: new Date(), provider }])
         } catch (e) {
             setMessages(prev => [...prev, {
@@ -404,77 +424,81 @@ export default function AIAssistantPanel() {
             {/* Floating trigger button */}
             <button
                 onClick={() => setIsOpen(o => !o)}
-                className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 text-white px-4 py-3 rounded-2xl shadow-xl shadow-primary-500/30 transition-all duration-200 hover:shadow-primary-500/50 hover:-translate-y-0.5 group"
-                aria-label="Open AI Assistant"
+                className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-black hover:bg-slate-900 border border-slate-800 text-white px-5 py-4 rounded-full shadow-2xl transition-all duration-300 hover:shadow-cyan-500/20 hover:-translate-y-1 group"
+                aria-label="Open Intelera AI Assistant"
             >
-                <HiSparkles className="h-5 w-5 group-hover:rotate-12 transition-transform" />
-                <span className="text-sm font-bold hidden sm:block">AI Assistant</span>
+                <div className="relative flex items-center justify-center">
+                    <div className="absolute inset-0 bg-cyan-500 blur-md opacity-40 group-hover:opacity-100 transition-opacity" />
+                    <HiSparkles className="h-5 w-5 relative text-cyan-400 group-hover:rotate-12 transition-transform" />
+                </div>
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] hidden sm:block">Intelera AI Assistant</span>
             </button>
 
             {/* Chat panel */}
             {isOpen && (
                 <div
-                    className="fixed bottom-[5.5rem] right-6 z-50 w-80 sm:w-[22rem] bg-white rounded-3xl shadow-2xl border border-gray-100 flex flex-col animate-fade-in overflow-hidden"
-                    style={{ height: '540px' }}
+                    className="fixed bottom-[5.5rem] right-6 z-50 w-80 sm:w-[24rem] bg-white rounded-[32px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border border-slate-200 flex flex-col animate-fade-in overflow-hidden"
+                    style={{ height: '560px' }}
                 >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-primary-600 to-indigo-600 text-white flex-shrink-0">
-                        <div className="flex items-center gap-2.5">
-                            <div className="h-8 w-8 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                                <HiSparkles className="h-4 w-4" />
+                    <div className="flex items-center justify-between px-5 py-4 bg-slate-950 text-white flex-shrink-0 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/20 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
+                        <div className="flex items-center gap-3 relative z-10 w-full pr-8">
+                            <div className="h-10 w-10 bg-black border border-slate-800 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner">
+                                <HiSparkles className="h-5 w-5 text-cyan-400" />
                             </div>
-                            <div>
-                                <p className="text-sm font-bold leading-none">{ASSISTANT_NAME}</p>
-                                <div className="mt-0.5 flex items-center gap-1">
-                                    <span className="relative flex h-1.5 w-1.5">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-black leading-none tracking-tight uppercase text-slate-50">{ASSISTANT_NAME}</p>
+                                <div className="mt-1.5 flex items-center gap-2 bg-slate-900/50 rounded-full pl-2 pr-3 py-1 border border-slate-800/80 w-max">
+                                    <span className="relative flex h-2 w-2 shrink-0">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
                                     </span>
-                                        <select
-                                            value={selectedModel}
-                                            onChange={e => setSelectedModel(e.target.value)}
-                                            className="text-[10px] sm:text-[11px] bg-transparent text-primary-100 hover:text-white border-0 outline-none appearance-none cursor-pointer focus:ring-0 font-medium tracking-wide flex-1"
-                                        >
-                                            {availableAgents.map(a => (
-                                                <option key={a.id} value={a.id} className="text-gray-900">
-                                                    {a.label}
-                                                </option>
-                                            ))}
-                                        </select>
+                                    <select
+                                        value={selectedModel}
+                                        onChange={e => setSelectedModel(e.target.value)}
+                                        className="text-[9px] sm:text-[10px] bg-transparent text-slate-300 hover:text-white border-0 outline-none appearance-none cursor-pointer focus:ring-0 font-black uppercase tracking-widest flex-1 min-w-0"
+                                    >
+                                        {availableAgents.map(a => (
+                                            <option key={a.id} value={a.id} className="text-gray-900 font-bold">
+                                                {a.label}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                            <button onClick={clearChat} className="p-1.5 rounded-xl hover:bg-white/20 transition-colors" title="Clear chat">
-                                <HiRefresh className="h-3.5 w-3.5" />
+                        <div className="flex items-center gap-1.5 relative z-10 absolute right-4">
+                            <button onClick={clearChat} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors" title="Clear chat">
+                                <HiRefresh className="h-3.5 w-3.5 text-slate-300" />
                             </button>
-                            <button onClick={() => setIsOpen(false)} className="p-1.5 rounded-xl hover:bg-white/20 transition-colors">
-                                <HiX className="h-4 w-4" />
+                            <button onClick={() => setIsOpen(false)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors">
+                                <HiX className="h-3.5 w-3.5 text-slate-300" />
                             </button>
                         </div>
                     </div>
 
                     {/* Messages */}
-                    <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-gray-50/50">
+                    <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-slate-50">
                         {messages.map((msg, i) => (
-                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-start`}>
+                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-2`}>
                                 {msg.role === 'assistant' && (
-                                    <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-primary-500 to-indigo-500 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 shadow-sm">
-                                        <HiSparkles className="h-3.5 w-3.5 text-white" />
+                                    <div className="h-8 w-8 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 shadow-md">
+                                        <HiSparkles className="h-4 w-4 text-cyan-400" />
                                     </div>
                                 )}
-                                <div className="max-w-[82%]">
+                                <div className="max-w-[78%]">
                                     <div
-                                        className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
-                                            ? 'bg-gradient-to-br from-primary-600 to-indigo-600 text-white rounded-tr-none shadow-md shadow-primary-500/20'
+                                        className={`px-4 py-3 text-[13px] leading-relaxed font-medium ${msg.role === 'user'
+                                            ? 'bg-slate-950 text-white rounded-[24px] rounded-br-[8px] shadow-lg border border-slate-900'
                                             : msg.provider === 'error'
-                                                ? 'bg-red-50 border border-red-100 text-red-800 rounded-tl-none'
-                                                : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none shadow-sm'
+                                                ? 'bg-red-50 border border-red-100 text-red-800 rounded-[24px] rounded-bl-[8px]'
+                                                : 'bg-white text-slate-800 border border-slate-200/60 rounded-[24px] rounded-bl-[8px] shadow-sm'
                                         }`}
                                         dangerouslySetInnerHTML={{ __html: formatMessage(msg.text) }}
                                     />
                                     {msg.provider && PROVIDER_LABELS[msg.provider] && (
-                                        <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1 px-1">
+                                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1.5 flex items-center gap-1.5 px-1 opacity-70">
                                             <HiGlobe className="h-2.5 w-2.5" />
                                             {PROVIDER_LABELS[msg.provider]}
                                         </p>
@@ -485,20 +509,17 @@ export default function AIAssistantPanel() {
 
                         {/* Typing indicator */}
                         {isTyping && (
-                            <div className="flex justify-start items-center gap-2">
-                                <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-primary-500 to-indigo-500 flex items-center justify-center flex-shrink-0 shadow-sm">
-                                    <HiSparkles className="h-3.5 w-3.5 text-white animate-pulse" />
+                            <div className="flex justify-start items-end gap-2">
+                                <div className="h-8 w-8 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0 shadow-md">
+                                    <HiSparkles className="h-4 w-4 text-cyan-400 animate-pulse" />
                                 </div>
-                                <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
+                                <div className="bg-white border border-slate-200/60 rounded-[24px] rounded-bl-[8px] px-4 py-3 shadow-sm">
                                     <div className="flex gap-1 items-center">
-                                        <span className="h-2 w-2 bg-primary-400 rounded-full animate-bounce [animation-delay:0ms]" />
-                                        <span className="h-2 w-2 bg-primary-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                                        <span className="h-2 w-2 bg-primary-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                                        <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                                        <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                                        <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce [animation-delay:300ms]" />
                                     </div>
                                 </div>
-                                <span className="text-[10px] text-gray-400">
-                                    Generating from {selectedModel === 'auto' ? 'best available model' : selectedModel}...
-                                </span>
                             </div>
                         )}
                         <div ref={bottomRef} />
@@ -506,12 +527,12 @@ export default function AIAssistantPanel() {
 
                     {/* Suggested prompts (only at start) */}
                     {messages.length <= 1 && !isTyping && (
-                        <div className="px-3 pt-2 pb-1.5 flex gap-1.5 flex-wrap bg-white border-t border-gray-50">
+                        <div className="px-5 pb-3 flex gap-2 flex-wrap bg-slate-50 pt-1">
                             {SUGGESTED_PROMPTS.map(p => (
                                 <button
                                     key={p}
                                     onClick={() => handlePrompt(p)}
-                                    className="text-[11px] bg-primary-50 text-primary-700 border border-primary-100 px-2.5 py-1.5 rounded-xl hover:bg-primary-100 transition-colors font-semibold whitespace-nowrap"
+                                    className="text-[10px] bg-white text-slate-600 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-100 hover:text-black transition-colors font-black uppercase tracking-wider whitespace-nowrap shadow-sm"
                                 >
                                     {p}
                                 </button>
@@ -520,23 +541,25 @@ export default function AIAssistantPanel() {
                     )}
 
                     {/* Input bar */}
-                    <div className="px-3 py-3 border-t border-gray-100 flex gap-2 items-end bg-white">
-                        <textarea
-                            ref={textareaRef}
-                            value={input}
-                            onChange={e => setInput(e.target.value)}
-                            onKeyDown={handleKey}
-                            placeholder="Ask about Liberian law, clauses, documents..."
-                            rows={1}
-                            className="flex-1 resize-none input-field py-2.5 text-sm rounded-xl"
-                        />
-                        <button
-                            onClick={send}
-                            disabled={!input.trim() || isTyping}
-                            className="bg-gradient-to-r from-primary-600 to-indigo-600 text-white p-2.5 rounded-xl disabled:opacity-40 flex-shrink-0 hover:shadow-lg hover:shadow-primary-500/30 transition-all"
-                        >
-                            <HiPaperAirplane className="h-4 w-4 rotate-90" />
-                        </button>
+                    <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.02)]">
+                        <div className="flex gap-2 items-end bg-slate-50 border border-slate-200 rounded-[20px] p-1.5 focus-within:border-slate-400 focus-within:bg-white transition-all">
+                            <textarea
+                                ref={textareaRef}
+                                value={input}
+                                onChange={e => setInput(e.target.value)}
+                                onKeyDown={handleKey}
+                                placeholder="Message Intelera AI..."
+                                rows={1}
+                                className="flex-1 resize-none bg-transparent py-3 px-3 text-sm rounded-xl outline-none text-slate-800 placeholder-slate-400 font-medium"
+                            />
+                            <button
+                                onClick={send}
+                                disabled={!input.trim() || isTyping}
+                                className="bg-black text-white p-3 rounded-[16px] disabled:opacity-40 disabled:bg-slate-300 flex-shrink-0 hover:bg-slate-800 hover:shadow-lg transition-all"
+                            >
+                                <HiPaperAirplane className="h-4 w-4 rotate-90 text-cyan-400" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

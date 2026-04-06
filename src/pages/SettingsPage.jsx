@@ -15,6 +15,9 @@ import useAuthStore from '../store/useAuthStore'
 import useToastStore from '../store/useToastStore'
 import { addMonths, addYears, format } from 'date-fns'
 import clsx from 'clsx'
+import { db } from '../firebase'
+import { doc, setDoc, onSnapshot } from 'firebase/firestore'
+import { useEffect } from 'react'
 
 const PLANS = [
     {
@@ -90,9 +93,17 @@ export default function SettingsPage() {
         weeklyDigest: false,
         financialReports: true,
     })
-    const [aiConfig, setAiConfig] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('ldgfa_ai_config') || '{}') } catch { return {} }
-    })
+    const [aiConfig, setAiConfig] = useState({})
+    
+    // Listen to global AI config from Firestore
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, 'system', 'ai_config'), (docSnap) => {
+            if (docSnap.exists()) {
+                setAiConfig(docSnap.data())
+            }
+        })
+        return () => unsub()
+    }, [])
     const [aiSaving, setAiSaving] = useState(false)
 
     const nextBillingDate = isYearly
@@ -119,10 +130,13 @@ export default function SettingsPage() {
 
     const handleSaveAiConfig = async () => {
         setAiSaving(true)
-        localStorage.setItem('ldgfa_ai_config', JSON.stringify(aiConfig))
-        await new Promise(r => setTimeout(r, 800))
+        try {
+            await setDoc(doc(db, 'system', 'ai_config'), aiConfig)
+            addToast('AI settings broadcasted globally.', 'success')
+        } catch (e) {
+            addToast('Failed to save AI settings.', 'error')
+        }
         setAiSaving(false)
-        addToast('AI settings saved.', 'success')
     }
 
     const handleApprove = (id, name) => {
