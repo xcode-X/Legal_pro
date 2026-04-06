@@ -4,7 +4,8 @@
  * Config is read fresh on every message send (not once at mount).
  */
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { HiSparkles, HiX, HiPaperAirplane, HiGlobe, HiRefresh, HiLightningBolt } from 'react-icons/hi'
+import { HiSparkles, HiX, HiPaperAirplane, HiGlobe, HiRefresh, HiLightningBolt, HiDownload } from 'react-icons/hi'
+import { jsPDF } from 'jspdf'
 import { db } from '../../firebase'
 import { doc, onSnapshot } from 'firebase/firestore'
 
@@ -336,6 +337,7 @@ export default function AIAssistantPanel() {
     }])
     const [input, setInput] = useState('')
     const [isTyping, setIsTyping] = useState(false)
+    const [showExportMenu, setShowExportMenu] = useState(false)
     const [selectedModel, setSelectedModel] = useState('auto')
     const [availableAgents, setAvailableAgents] = useState([])
     const bottomRef = useRef(null)
@@ -417,6 +419,66 @@ export default function AIAssistantPanel() {
         }])
     }
 
+    const handleExport = (format) => {
+        setShowExportMenu(false)
+        const exportTime = new Date().toISOString().replace(/[:.]/g, '-')
+        const filename = `AI_Chat_Export_${exportTime}`
+
+        if (format === 'txt') {
+            const textContent = messages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n\n')
+            const blob = new Blob([textContent], { type: 'text/plain' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${filename}.txt`
+            a.click()
+            URL.revokeObjectURL(url)
+        } else if (format === 'csv') {
+            const csvContent = ['Role,Message,Timestamp']
+                .concat(messages.map(m => `"${m.role}","${m.text.replace(/"/g, '""')}","${m.ts}"`))
+                .join('\n')
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${filename}.csv`
+            a.click()
+            URL.revokeObjectURL(url)
+        } else if (format === 'doc') {
+            const htmlContent = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head><meta charset='utf-8'><title>Chat Export</title></head><body>
+                <h2>Intelera AI - Chat Export</h2>
+                ${messages.map(m => `<h3>${m.role.toUpperCase()}</h3><p>${m.text.replace(/\n/g, '<br>')}</p>`).join('')}
+                </body></html>
+            `
+            const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${filename}.doc`
+            a.click()
+            URL.revokeObjectURL(url)
+        } else if (format === 'pdf') {
+            const doc = new jsPDF()
+            let y = 20
+            doc.setFontSize(16)
+            doc.text("Intelera AI - Chat Export", 10, y)
+            y += 10
+            doc.setFontSize(11)
+            messages.forEach(m => {
+                if (y > 270) { doc.addPage(); y = 20; }
+                doc.setFont("helvetica", "bold")
+                doc.text(m.role.toUpperCase() + ":", 10, y)
+                doc.setFont("helvetica", "normal")
+                const lines = doc.splitTextToSize(m.text, 180)
+                doc.text(lines, 10, y + 5)
+                y += (lines.length * 5) + 8
+            })
+            doc.save(`${filename}.pdf`)
+        }
+    }
+
 
 
     return (
@@ -469,6 +531,19 @@ export default function AIAssistantPanel() {
                             </div>
                         </div>
                         <div className="flex items-center gap-1.5 relative z-10 absolute right-4">
+                            <div className="relative">
+                                <button onClick={() => setShowExportMenu(!showExportMenu)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors" title="Export chat">
+                                    <HiDownload className="h-3.5 w-3.5 text-slate-300" />
+                                </button>
+                                {showExportMenu && (
+                                    <div className="absolute right-0 mt-2 w-32 bg-white rounded-[12px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] border border-slate-200 py-1.5 z-[100] overflow-hidden">
+                                        <button onClick={() => handleExport('pdf')} className="w-full text-left px-4 py-2 text-[10px] font-black text-slate-700 hover:bg-slate-50 hover:text-cyan-600 uppercase tracking-widest transition-colors">Export PDF</button>
+                                        <button onClick={() => handleExport('doc')} className="w-full text-left px-4 py-2 text-[10px] font-black text-slate-700 hover:bg-slate-50 hover:text-cyan-600 uppercase tracking-widest transition-colors">Export Word</button>
+                                        <button onClick={() => handleExport('csv')} className="w-full text-left px-4 py-2 text-[10px] font-black text-slate-700 hover:bg-slate-50 hover:text-cyan-600 uppercase tracking-widest transition-colors">Export Excel</button>
+                                        <button onClick={() => handleExport('txt')} className="w-full text-left px-4 py-2 text-[10px] font-black text-slate-700 hover:bg-slate-50 hover:text-cyan-600 uppercase tracking-widest transition-colors">Export Text</button>
+                                    </div>
+                                )}
+                            </div>
                             <button onClick={clearChat} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors" title="Clear chat">
                                 <HiRefresh className="h-3.5 w-3.5 text-slate-300" />
                             </button>

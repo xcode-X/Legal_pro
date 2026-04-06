@@ -172,7 +172,11 @@ const useAuthStore = create(
                         return { success: false }
                     }
                 } catch (error) {
-                    set({ isLoading: false, error: error.message })
+                    let errorMessage = error.message
+                    if (error.code === 'auth/invalid-credential' || error.message.includes('auth/invalid-credential')) {
+                        errorMessage = 'Invalid email or password. Please check your credentials and try again.'
+                    }
+                    set({ isLoading: false, error: errorMessage })
                     return { success: false }
                 }
             },
